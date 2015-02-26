@@ -55,36 +55,48 @@ def login():
   return doLogin()
 
 def doLogin():
-
-  cookie = Cookie.SimpleCookie()
-  #method = urlfetch.POST
-  
-  form_fields = {
-   "login_useremail": __settings__.getSetting('username'),
-   "login_password": __settings__.getSetting('password'),
-   "url_refe": "https://www.fshare.vn/index.php"
-  }
-
-  form_data = urllib.urlencode(form_fields)
-  
-  response = urlfetch.fetch(
-    url = 'https://www.fshare.vn/login.php',
-	method='POST',
-    headers = headers,
-	data=form_data,
-    follow_redirects = False)
-
-  cookie.load(response.headers.get('set-cookie', ''))
-  headers['Cookie'] = _makeCookieHeader(cookie)
-  #cache.set('cookie',headers['Cookie'])
-  
-  if headers['Cookie'].find('-1')>0:
-    xbmc.executebuiltin((u'XBMC.Notification("%s", "%s", %s)' % ('Login', 'Login failed. You must input correct FShare username/pass in Add-on settings', '15')).encode("utf-8"))   
-    return False
-  else:
-    # xbmc.executebuiltin((u'XBMC.Notification("%s", "%s", %s)' % ('Login', 'Login successful', '15')).encode("utf-8"))   
-    return headers['Cookie']
+	res1 = urlfetch.fetch(
+		url = 'https://www.fshare.vn/index.php',
+	)
+	cookie = Cookie.SimpleCookie()
+	cookie.load(res1.headers.get('set-cookie', ''))
+        
+	soup1 = BeautifulSoup(str(res1.body), convertEntities=BeautifulSoup.HTML_ENTITIES)
+        results1=soup1.findAll('input', attrs={'type': 'hidden'})
+	for folder in results1:
+		a=folder.find('input')
+		name=folder.get('name')
+		value=folder.get('value')
+		if 'fs_csrf' in name:
+			fs_csrf=value
+	print "code csrf : ",fs_csrf, "email:", __settings__.getSetting('username'), "password :", __settings__.getSetting('password')
 	
+	#form_data = urllib.urlencode(form_fields)
+	
+	response = urlfetch.fetch(
+		url = 'https://www.fshare.vn/login',
+		method='POST',
+		headers = {
+			'Referer':'https://www.fshare.vn/index.php',
+			'Cookie':_makeCookieHeader(cookie),
+		},
+		data={
+        		"LoginForm[email]": __settings__.getSetting('username'),
+        		"LoginForm[password]": __settings__.getSetting('password'),
+        	 	"fs_csrf":fs_csrf,
+		 	"LoginForm[rememberMe]": "1", 
+	        },
+		follow_redirects = False)
+	print "status : ", response.status
+	cookie.load(response.headers.get('set-cookie', ''))
+	headers['Cookie'] = _makeCookieHeader(cookie)
+	
+	if headers['Cookie'].find('-1')>0:
+		xbmc.executebuiltin((u'XBMC.Notification("%s", "%s", %s)' % ('Login', 'Login failed. You must input correct FShare username/pass in Add-on settings', '15')).encode("utf-8"))	 
+		return False
+	else:
+		# xbmc.executebuiltin((u'XBMC.Notification("%s", "%s", %s)' % ('Login', 'Login successful', '15')).encode("utf-8"))	 
+		return headers['Cookie']	
 def make_request(url, headers=None):
         headers2 = {
             'Accept':'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
